@@ -239,7 +239,7 @@ function legacyCreateSpanLinkFactory(
  */
 const defaultKeys = ['cluster', 'hostname', 'namespace', 'pod'];
 function getLinkForLoki(span: TraceSpan, options: TraceToLogsOptions, dataSourceSettings: DataSourceInstanceSettings) {
-  const { tags: keys, filterByTraceID, filterBySpanID, mapTagNamesEnabled, mappedTags } = options;
+  const { tags: keys, filterByTraceID, filterBySpanID, mapTagNamesEnabled, mappedTags, queryTags } = options;
 
   // In order, try to use mapped tags -> tags -> default tags
   const keysToCheck = mapTagNamesEnabled && mappedTags?.length ? mappedTags : keys?.length ? keys : defaultKeys;
@@ -262,7 +262,14 @@ function getLinkForLoki(span: TraceSpan, options: TraceToLogsOptions, dataSource
   if (!tags.length) {
     return undefined;
   }
-  let expr = `{${tags.join(', ')}}`;
+  let expr = '{';
+  expr += `${tags.join(', ')}`;
+  if (queryTags && queryTags.length > 0) {
+    for (const tag of queryTags) {
+      expr += `, ${tag}`;
+    }
+  }
+  expr += '}';
   if (filterByTraceID && span.traceID) {
     expr += ` |="${span.traceID}"`;
   }
@@ -301,7 +308,7 @@ function getLinkForElasticsearchOrOpensearch(
   options: TraceToLogsOptions,
   dataSourceSettings: DataSourceInstanceSettings
 ) {
-  const { tags: keys, filterByTraceID, filterBySpanID, mapTagNamesEnabled, mappedTags } = options;
+  const { tags: keys, filterByTraceID, filterBySpanID, mapTagNamesEnabled, mappedTags, queryTags } = options;
   const tags = [...span.process.tags, ...span.tags].reduce((acc: string[], tag) => {
     if (mapTagNamesEnabled && mappedTags?.length) {
       const keysToCheck = mappedTags;
@@ -321,6 +328,11 @@ function getLinkForElasticsearchOrOpensearch(
   let query = '';
   if (tags.length > 0) {
     query += `${tags.join(' AND ')}`;
+  }
+  if (queryTags && queryTags.length > 0) {
+    for (const tag of queryTags) {
+      query += ` AND ${tag}`;
+    }
   }
   if (filterByTraceID && span.traceID) {
     query = `"${span.traceID}" AND ` + query;
@@ -356,7 +368,7 @@ function getLinkForSplunk(
   options: TraceToLogsOptions,
   dataSourceSettings: DataSourceInstanceSettings
 ) {
-  const { tags: keys, filterByTraceID, filterBySpanID, mapTagNamesEnabled, mappedTags } = options;
+  const { tags: keys, filterByTraceID, filterBySpanID, mapTagNamesEnabled, mappedTags, queryTags } = options;
 
   // In order, try to use mapped tags -> tags -> default tags
   const keysToCheck = mapTagNamesEnabled && mappedTags?.length ? mappedTags : keys?.length ? keys : defaultKeys;
@@ -378,6 +390,11 @@ function getLinkForSplunk(
   let query = '';
   if (tags.length > 0) {
     query += `${tags.join(' ')}`;
+  }
+  if (queryTags && queryTags.length > 0) {
+    for (const tag of queryTags) {
+      query += ` ${tag}`;
+    }
   }
   if (filterByTraceID && span.traceID) {
     query += ` "${span.traceID}"`;
